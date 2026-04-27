@@ -4,7 +4,7 @@ repos:
   - name: gnuradio4
     url: https://github.com/fair-acc/gnuradio4
     dest: src/gnuradio4
-    ref: main
+    ref: 23e060204744dc9b4a79e7a677d625ee1ea94a4e
 
   - name: gr4-incubator
     url: https://github.com/gnuradio/gr4-incubator
