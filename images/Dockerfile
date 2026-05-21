@@ -19,6 +19,7 @@ ARG GNURADIO4_SOURCE=
 ARG GNURADIO4_REPO=https://github.com/gnuradio/gnuradio4.git
 ARG GNURADIO4_REF=main
 ARG GR_SPLIT_BLOCK_INSTANTIATIONS=OFF
+ARG GR4_USE_LIBCXX=OFF
 
 COPY src/gnuradio4/ /opt/gnuradio4-local/
 
@@ -55,7 +56,7 @@ RUN --mount=type=cache,target=/root/.cache/ccache \
       -DTHREAD_SANITIZER=OFF \
       -DBUILD_SHARED_LIBS=ON \
       -DGR_SPLIT_BLOCK_INSTANTIATIONS="${GR_SPLIT_BLOCK_INSTANTIATIONS}" \
-      -DGR4_USE_LIBCXX=OFF \
+      -DGR4_USE_LIBCXX="${GR4_USE_LIBCXX}" \
       -DENABLE_TESTING=OFF \
       -DENABLE_EXAMPLES=OFF \
     && cmake --build build -j"$(nproc)" \
@@ -68,6 +69,7 @@ ARG OCI_URL
 ARG OCI_REVISION
 ARG OCI_VERSION
 ARG SOURCE_MODE=local
+ARG GR4_USE_LIBCXX=OFF
 ARG GR4_INCUBATOR_REPO=https://github.com/gnuradio/gr4-incubator.git
 ARG GR4_INCUBATOR_REF=main
 
@@ -90,6 +92,11 @@ RUN set -eux; \
     esac
 
 RUN --mount=type=cache,target=/root/.cache/ccache \
+    set -eux; \
+    libcxx_args=""; \
+    if [ "${GR4_USE_LIBCXX}" = "ON" ]; then \
+      libcxx_args="-DCMAKE_CXX_FLAGS=-stdlib=libc++ -DCMAKE_EXE_LINKER_FLAGS=-stdlib=libc++ -DCMAKE_SHARED_LINKER_FLAGS=-stdlib=libc++"; \
+    fi; \
     cd /opt/gr4-incubator && \
     cmake -S . -B build -G Ninja \
       -DCMAKE_BUILD_TYPE=Release \
@@ -99,11 +106,28 @@ RUN --mount=type=cache,target=/root/.cache/ccache \
       -DENABLE_TESTING=OFF \
       -DENABLE_EXAMPLES=OFF \
       -DENABLE_GUI_EXAMPLES=OFF \
-      -DENABLE_PLUGINS=ON && \
+      -DENABLE_PLUGINS=ON \
+      ${libcxx_args} && \
     cmake --build build -j"$(nproc)" && \
     cmake --install build
 
 RUN ldconfig
+
+RUN set -eux; \
+    if [ "${GR4_USE_LIBCXX}" = "ON" ]; then \
+      install -m 0644 /opt/gnuradio4/build/_deps/cpp-httplib-src/httplib.h /usr/local/include/httplib.h; \
+      install -d /usr/local/lib/pkgconfig; \
+      { \
+        printf '%s\n' 'prefix=/usr/local'; \
+        printf '%s\n' 'includedir=${prefix}/include'; \
+        printf '%s\n' ''; \
+        printf '%s\n' 'Name: cpp-httplib'; \
+        printf '%s\n' 'Description: C++ HTTP/HTTPS server and client library'; \
+        printf '%s\n' 'Version: 0.18.1'; \
+        printf '%s\n' 'Cflags: -I${includedir} -DCPPHTTPLIB_OPENSSL_SUPPORT -DCPPHTTPLIB_ZLIB_SUPPORT -DCPPHTTPLIB_BROTLI_SUPPORT'; \
+        printf '%s\n' 'Libs:'; \
+      } > /usr/local/lib/pkgconfig/cpp-httplib.pc; \
+    fi
 
 LABEL org.opencontainers.image.title="gnuradio4-sdk" \
       org.opencontainers.image.description="GNU Radio 4 base SDK image for building compatible downstream plugins" \
@@ -126,6 +150,7 @@ FROM toolchain AS builder
 
 ARG GR4CP_INSTALL_PREFIX=/opt/gr4-control-plane
 ARG SOURCE_MODE=local
+ARG GR4_USE_LIBCXX=OFF
 ARG CONTROL_PLANE_REPO=https://github.com/altiolabs/gr4-control-plane
 ARG CONTROL_PLANE_REF=main
 
@@ -150,6 +175,11 @@ RUN set -eux; \
 WORKDIR /workspaces/gr4-control-plane
 
 RUN --mount=type=cache,target=/root/.cache/ccache \
+    set -eux; \
+    libcxx_args=""; \
+    if [ "${GR4_USE_LIBCXX}" = "ON" ]; then \
+      libcxx_args="-DCMAKE_CXX_FLAGS=-stdlib=libc++ -DCMAKE_EXE_LINKER_FLAGS=-stdlib=libc++ -DCMAKE_SHARED_LINKER_FLAGS=-stdlib=libc++"; \
+    fi; \
     cmake -S . -B build -G Ninja \
       -DCMAKE_BUILD_TYPE=Release \
       -DCMAKE_INSTALL_PREFIX="${GR4CP_INSTALL_PREFIX}" \
@@ -157,7 +187,8 @@ RUN --mount=type=cache,target=/root/.cache/ccache \
       -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
       -DGR4CP_GNURADIO4_PREFIX=/usr/local \
       -DGR4CP_SUPPRESS_IMPORTED_WERROR=ON \
-    && cmake --build build -j"$(nproc)" \
+      ${libcxx_args} \
+    && cmake --build build --target gr4cp_server gr4cp_cli_exec -j"$(nproc)" \
     && cmake --install build
 
 FROM toolchain AS studio-blocks-builder
@@ -165,6 +196,7 @@ FROM toolchain AS studio-blocks-builder
 ARG GR4CP_INSTALL_PREFIX=/opt/gr4-control-plane
 ARG STUDIO_BLOCKS_CACHE_BUST=0
 ARG SOURCE_MODE=local
+ARG GR4_USE_LIBCXX=OFF
 ARG STUDIO_REPO=https://github.com/altiolabs/gr4-studio
 ARG STUDIO_REF=main
 
@@ -189,12 +221,18 @@ RUN set -eux; \
 WORKDIR /workspaces/gr4-studio/blocks
 
 RUN --mount=type=cache,target=/root/.cache/ccache \
+    set -eux; \
+    libcxx_args=""; \
+    if [ "${GR4_USE_LIBCXX}" = "ON" ]; then \
+      libcxx_args="-DCMAKE_CXX_FLAGS=-stdlib=libc++ -DCMAKE_EXE_LINKER_FLAGS=-stdlib=libc++ -DCMAKE_SHARED_LINKER_FLAGS=-stdlib=libc++"; \
+    fi; \
     printf 'studio blocks cache bust: %s\n' "${STUDIO_BLOCKS_CACHE_BUST}" && \
     cmake -S . -B build -G Ninja \
       -DCMAKE_BUILD_TYPE=Release \
       -DCMAKE_INSTALL_PREFIX="${GR4CP_INSTALL_PREFIX}" \
       -DCMAKE_C_COMPILER_LAUNCHER=ccache \
       -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
+      ${libcxx_args} \
     && cmake --build build -j"$(nproc)" \
     && cmake --install build
 

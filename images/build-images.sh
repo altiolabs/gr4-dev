@@ -35,7 +35,8 @@ Options:
 Common environment overrides:
   PROFILE, IMAGE_NAMESPACE, BUILDER_NAMESPACE, BUILDER_IMAGE, PUSH_IMAGES,
   IMAGES, PLATFORMS, IMAGE_TAG, RUNTIME_BASE_IMAGE, SOURCE_MODE,
-  REPOS_FILE, GNURADIO4_REPO, GNURADIO4_REF, GHCR_TOKEN, GITHUB_TOKEN
+  REPOS_FILE, GNURADIO4_REPO, GNURADIO4_REF, GR4_USE_LIBCXX,
+  GHCR_TOKEN, GITHUB_TOKEN
 EOF
 }
 
@@ -141,6 +142,12 @@ else
 fi
 
 PROFILE="${BUILDER_DISTRO}-${BUILDER_PROFILE}"
+if [[ -z "${GR4_USE_LIBCXX:-}" ]]; then
+  case "${BUILDER_PROFILE}" in
+    clang*) GR4_USE_LIBCXX=ON ;;
+    *) GR4_USE_LIBCXX=OFF ;;
+  esac
+fi
 
 if [[ -z "${IMAGE_NAMESPACE:-}" ]]; then
   if [[ "${PUSH_IMAGES}" == "1" ]]; then
@@ -341,7 +348,8 @@ registry_accessible_image() {
 common_build_args() {
   local args=(
     --build-arg "GR4_DEV_BUILDER_IMAGE=${BUILDER_IMAGE}" \
-    --build-arg "RUNTIME_BASE_IMAGE=${RUNTIME_BASE_IMAGE}"
+    --build-arg "RUNTIME_BASE_IMAGE=${RUNTIME_BASE_IMAGE}" \
+    --build-arg "GR4_USE_LIBCXX=${GR4_USE_LIBCXX}"
   )
 
   if [[ -n "${STUDIO_BLOCKS_CACHE_BUST}" ]]; then
@@ -429,6 +437,7 @@ Builder profile: ${BUILDER_PROFILE}
 Builder namespace: ${BUILDER_NAMESPACE}
 Builder image: ${BUILDER_IMAGE}
 Runtime base image: ${RUNTIME_BASE_IMAGE}
+GR4 use libc++: ${GR4_USE_LIBCXX}
 Push images: ${PUSH_IMAGES}
 Product platforms: ${PLATFORMS}
 Image namespace: ${IMAGE_NAMESPACE}
