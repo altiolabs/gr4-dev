@@ -1,10 +1,20 @@
 # Repository manifest for workspace bootstrap.
 # ref accepts a branch, tag, or commit SHA.
 repos:
-  - name: gnuradio4
-    url: https://github.com/gnuradio/gnuradio4
-    dest: src/gnuradio4
-    ref: main
+  - name: gnuradio4-core
+    url: https://github.com/mormj/gnuradio4-core
+    dest: src/gnuradio4-core
+    ref: split_repos
+
+  - name: gnuradio4-algorithm
+    url: https://github.com/mormj/gnuradio4-algorithm
+    dest: src/gnuradio4-algorithm
+    ref: split_repos
+
+  - name: gnuradio4-blocks
+    url: https://github.com/mormj/gnuradio4-blocks
+    dest: src/gnuradio4-blocks
+    ref: split_repos
 
   - name: gr4-incubator
     url: https://github.com/gnuradio/gr4-incubator
