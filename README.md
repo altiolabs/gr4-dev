@@ -150,6 +150,34 @@ curl http://localhost:8080/healthz         # -> {"ok":true} once ready
 (cd src/gnuradio4-studio && npm run dev)    # Studio UI on http://localhost:5173
 ```
 
+## Common commands
+
+Build one repo:
+
+```bash
+./scripts/build.sh gr4-incubator
+```
+
+Clean one repo build tree:
+
+```bash
+./scripts/clean.sh gr4-incubator
+```
+
+Clean all build trees:
+
+```bash
+./scripts/clean-all.sh
+```
+
+Wipe installed artifacts from `install/`:
+
+```bash
+./scripts/wipe.sh
+# non-interactive
+./scripts/wipe.sh --yes
+```
+
 ## Scaffold New Projects
 
 Create a new local out-of-tree project under `src/`:
@@ -292,8 +320,8 @@ Optional per-repo CMake source override:
 
 - `config/<repo>.cmake.source`
 
-Example: `config/gr4-studio.cmake.source` contains `blocks`, so Studio
-configures from `src/gr4-studio/blocks`.
+Example: `config/gnuradio4-studio.cmake.source` contains `blocks`, so Studio
+configures from `src/gnuradio4-studio/blocks`.
 
 When `build-all.sh` is called without args, it builds repos in `repos.yaml`
 order.
