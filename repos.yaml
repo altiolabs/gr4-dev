@@ -21,12 +21,12 @@ repos:
     dest: src/gr4-incubator
     ref: main
 
-  - name: gr4-control-plane
+  - name: gnuradio4-control-plane
     url: https://github.com/gnuradio/gnuradio4-control-plane
     dest: src/gnuradio4-control-plane
     ref: main
 
-  - name: gr4-studio
+  - name: gnuradio4-studio
     url: https://github.com/gnuradio/gnuradio4-studio
     dest: src/gnuradio4-studio
     ref: main
