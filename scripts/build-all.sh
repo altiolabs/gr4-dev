@@ -131,16 +131,26 @@ build_cmake_repo() {
 
   mkdir -p "${bdir}"
 
+  # Cap build parallelism when GR4_BUILD_JOBS is set; otherwise use the
+  # build tool's default (all cores). Heavy C++23 TUs (e.g. exprtk) use
+  # 2-3 GB each, so a low cap avoids OOM on constrained/WSL machines.
+  local -a build_jobs=()
+  if [ -n "${GR4_BUILD_JOBS:-}" ]; then
+    build_jobs=(-j "${GR4_BUILD_JOBS}")
+  else
+    build_jobs=(-j)
+  fi
+
   echo "==> building ${name} (cmake)"
   cmake -S "${source_dir}" -B "${bdir}" "${cmake_args[@]}"
-  cmake --build "${bdir}" -j
+  cmake --build "${bdir}" "${build_jobs[@]}"
   cmake --install "${bdir}"
 
   if [ "${name}" = "gnuradio4" ]; then
     install_gnuradio4_test_headers "${bdir}" "${GR4_PREFIX_PATH}"
   fi
 
-  if [ "${name}" = "gr4-studio" ]; then
+  if [ "${name}" = "gnuradio4-studio" ]; then
     echo "==> installing ${name} desktop app"
     (cd "${repo_dir}" && npm install && npm run build)
   fi
@@ -153,7 +163,7 @@ build_node_repo() {
   echo "==> building ${name} (node)"
   (cd "${repo_dir}" && npm install && npm run build)
 
-  if [ "${name}" = "gr4-studio" ]; then
+  if [ "${name}" = "gnuradio4-studio" ]; then
     if [ -z "${GR4_PREFIX_PATH:-}" ]; then
       echo "skip: ${name} install step needs GR4_PREFIX_PATH" >&2
       return 0
