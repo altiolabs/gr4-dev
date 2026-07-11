@@ -92,6 +92,12 @@ install_gnuradio4_test_headers() {
   fi
 }
 
+is_studio_repo() {
+  local name="$1"
+
+  [ "${name}" = "gr4-studio" ] || [ "${name}" = "gnuradio4-studio" ]
+}
+
 build_cmake_repo() {
   local name="$1"
   local source_dir="$2"
@@ -140,7 +146,7 @@ build_cmake_repo() {
     install_gnuradio4_test_headers "${bdir}" "${GR4_PREFIX_PATH}"
   fi
 
-  if [ "${name}" = "gr4-studio" ]; then
+  if is_studio_repo "${name}"; then
     echo "==> installing ${name} desktop app"
     (cd "${repo_dir}" && npm install && npm run build)
   fi
@@ -153,7 +159,7 @@ build_node_repo() {
   echo "==> building ${name} (node)"
   (cd "${repo_dir}" && npm install && npm run build)
 
-  if [ "${name}" = "gr4-studio" ]; then
+  if is_studio_repo "${name}"; then
     if [ -z "${GR4_PREFIX_PATH:-}" ]; then
       echo "skip: ${name} install step needs GR4_PREFIX_PATH" >&2
       return 0
