@@ -6,9 +6,9 @@ repos:
     dest: src/gnuradio4-core
     ref: main
 
-  - name: gnuradio4-algorithm
-    url: https://github.com/gnuradio/gnuradio4-algorithm
-    dest: src/gnuradio4-algorithm
+  - name: gnuradio4-library
+    url: https://github.com/gnuradio/gnuradio4-library
+    dest: src/gnuradio4-library
     ref: main
 
   - name: gnuradio4-blocks
