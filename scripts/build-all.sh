@@ -6,6 +6,63 @@ MANIFEST="${ROOT_DIR}/repos.yaml"
 # shellcheck disable=SC1091
 source "${ROOT_DIR}/scripts/dev-env.sh" >/dev/null
 
+GR4_BUILD_MEM_PROFILE="${GR4_BUILD_MEM_PROFILE:-0}"
+GR4_MEM_PROFILE_BUILD_SUFFIX="${GR4_MEM_PROFILE_BUILD_SUFFIX:--mem-profile}"
+GR4_MEM_PROFILE_WRAPPER="${ROOT_DIR}/scripts/build-mem-profile-wrapper.sh"
+GR4_MEM_PROFILE_LOG="${GR4_MEM_PROFILE_LOG:-${ROOT_DIR}/var/logs/build-memory/build-$(date -u '+%Y%m%dT%H%M%SZ').tsv}"
+GR4_MEM_PROFILE_SUMMARY_PRINTED=0
+
+mem_profile_enabled() {
+  case "${GR4_BUILD_MEM_PROFILE}" in
+    1|true|TRUE|yes|YES|on|ON) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+init_mem_profile_log() {
+  mem_profile_enabled || return 0
+
+  if [ ! -x "${GR4_MEM_PROFILE_WRAPPER}" ]; then
+    echo "error: memory profiling wrapper is not executable: ${GR4_MEM_PROFILE_WRAPPER}" >&2
+    return 1
+  fi
+
+  mkdir -p "$(dirname "${GR4_MEM_PROFILE_LOG}")"
+  printf 'timestamp\trepo\tkind\tmax_rss_kb\telapsed_seconds\texit_status\toutput\tprimary_input\tcommand\n' > "${GR4_MEM_PROFILE_LOG}"
+  export GR4_MEM_PROFILE_LOG
+
+  echo "==> build memory profiling enabled"
+  echo "==> memory profile log: ${GR4_MEM_PROFILE_LOG}"
+}
+
+print_mem_profile_summary() {
+  mem_profile_enabled || return 0
+  [ -f "${GR4_MEM_PROFILE_LOG}" ] || return 0
+  [ "${GR4_MEM_PROFILE_SUMMARY_PRINTED}" = "0" ] || return 0
+  GR4_MEM_PROFILE_SUMMARY_PRINTED=1
+
+  echo "==> top build memory users (max RSS)"
+  awk -F '\t' '
+    NR > 1 && $4 ~ /^[0-9]+$/ {
+      mib = $4 / 1024;
+      label = $7;
+      if (label == "") {
+        label = $8;
+      }
+      if (label == "") {
+        label = $9;
+      }
+      printf "%12.1f MiB\t%s\t%s\t%s\n", mib, $2, $3, label;
+    }
+  ' "${GR4_MEM_PROFILE_LOG}" | sort -nr | head -n "${GR4_MEM_PROFILE_TOP:-20}"
+}
+
+print_mem_profile_summary_on_exit() {
+  local status="$?"
+  print_mem_profile_summary
+  exit "${status}"
+}
+
 parse_manifest_name_dest() {
   if [ ! -f "${MANIFEST}" ]; then
     echo "error: missing ${MANIFEST}" >&2
@@ -102,10 +159,15 @@ build_cmake_repo() {
   local name="$1"
   local source_dir="$2"
   local repo_dir="$3"
-  local bdir="${GR4_BUILD_PATH}/${name}"
+  local default_bdir="${GR4_BUILD_PATH}/${name}"
+  local bdir="${default_bdir}"
   local -a cmake_args
   local c_flags=""
   local cxx_flags=""
+
+  if mem_profile_enabled; then
+    bdir="${default_bdir}${GR4_MEM_PROFILE_BUILD_SUFFIX}"
+  fi
 
   cmake_args=("-DCMAKE_INSTALL_PREFIX=${GR4_PREFIX_PATH}")
 
@@ -133,13 +195,27 @@ build_cmake_repo() {
 
   while IFS= read -r arg; do
     cmake_args+=("${arg}")
-  done < <(append_args_from_file "${bdir}/cmake.args")
+  done < <(append_args_from_file "${default_bdir}/cmake.args")
+
+  if [ "${bdir}" != "${default_bdir}" ]; then
+    while IFS= read -r arg; do
+      cmake_args+=("${arg}")
+    done < <(append_args_from_file "${bdir}/cmake.args")
+  fi
+
+  if mem_profile_enabled; then
+    cmake_args+=("-DUSE_CCACHE=OFF")
+    cmake_args+=("-DCMAKE_C_COMPILER_LAUNCHER=${GR4_MEM_PROFILE_WRAPPER}")
+    cmake_args+=("-DCMAKE_CXX_COMPILER_LAUNCHER=${GR4_MEM_PROFILE_WRAPPER}")
+    cmake_args+=("-DCMAKE_C_LINKER_LAUNCHER=${GR4_MEM_PROFILE_WRAPPER}")
+    cmake_args+=("-DCMAKE_CXX_LINKER_LAUNCHER=${GR4_MEM_PROFILE_WRAPPER}")
+  fi
 
   mkdir -p "${bdir}"
 
   echo "==> building ${name} (cmake)"
   cmake -S "${source_dir}" -B "${bdir}" "${cmake_args[@]}"
-  cmake --build "${bdir}" -j
+  GR4_MEM_PROFILE_REPO="${name}" cmake --build "${bdir}" -j
   cmake --install "${bdir}"
 
   if [ "${name}" = "gnuradio4" ]; then
@@ -198,6 +274,11 @@ build_repo() {
   fi
 }
 
+init_mem_profile_log
+if mem_profile_enabled; then
+  trap print_mem_profile_summary_on_exit EXIT
+fi
+
 if [ "$#" -gt 0 ]; then
   for repo in "$@"; do
     if repo_dest="$(repo_dest_from_manifest "${repo}")"; then
@@ -213,5 +294,7 @@ else
     build_repo "${repo}" "${ROOT_DIR}/${repo_dest}"
   done < <(parse_manifest_name_dest)
 fi
+
+print_mem_profile_summary
 
 echo "build-all complete"

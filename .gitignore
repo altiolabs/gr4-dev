@@ -4,6 +4,7 @@
 # Runtime artifacts
 data/
 var/logs/*.log
+var/logs/build-memory/
 var/run/*.pid
 
 # Build/install outputs

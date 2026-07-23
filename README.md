@@ -65,6 +65,18 @@ Build one repo:
 ./scripts/build.sh gr4-incubator
 ```
 
+Profile compile/link memory for a build:
+
+```bash
+GR4_BUILD_MEM_PROFILE=1 ./scripts/build-all.sh
+GR4_BUILD_MEM_PROFILE=1 ./scripts/build.sh gnuradio4-core
+```
+
+This writes a tab-separated log under `var/logs/build-memory/` and prints the
+highest max-RSS compile/link commands at the end. Profiling disables ccache for
+CMake repos and uses `build/<repo>-mem-profile/` so the measured command is the
+compiler or linker work without changing the normal build tree.
+
 Clean one repo build tree:
 
 ```bash
